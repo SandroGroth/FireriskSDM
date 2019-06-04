@@ -1,0 +1,23 @@
+# 01. Determine Wildfire occurence data
+#     01.01. MODIS Burned Area dataset
+#         01.01.01 Burn frequency
+#              -> How often did a pixel burn in time period?
+#         01.01.02 Burn intensity
+#               -> Create a mean of burn temperature recorded
+#         01.01.03 Burn severity
+#               -> ???
+#     01.02. Search for analogue dataset containing fire records.
+#     01.03. Create occurence data points based on thresholds.
+# 02. Collect environmental variables that influence wildfire risk
+#     02.01. BIOCLIM: Max temperature
+#     02.02. BIOCLIM: Precipitation (maybe drought index for seasonality)
+#     02.03. Distance to roads
+#         02.03.01. Get openstreetmap road data
+#         02.03.02. Calculate distance raster
+#     02.04. Slope
+#         02.04.01 Get SRTM data
+#         02.04.02 Calculate slope raster
+#     02.05. Landcover
+# 03. Model wildfire risk
+# 04. Model owl habitats
+# 05. Intersect habitat with risk and loop through climate scenarios.
