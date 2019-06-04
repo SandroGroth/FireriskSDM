@@ -45,22 +45,33 @@ date_end <- gsub("-", "/", time_range[2])
 product_dates <- seq.Date(from = as.Date(date_start), to = as.Date(date_end), by = "month")
 product_dates <- as.character(product_dates)
 
-# create new raster with extent of study area
+# create a burn acc dummy
 burn_acc <- NULL
-i = 1
+
+# loop thourgh all monthly records in query and add burned pixels to burn acc
+i <- 1
 while (i <= length(product_dates)) {
   message(paste0("Starting processing for date: ", as.character(product_dates[i])))
+  
+  # check if the mosaiced burned area product already exists
   if (length(list.files(mosaic_out_path, pattern = as.character(product_dates[i])) > 0)) {
-    raster_mosaic <- raster(paste0(mosaic_out_path, "\\", "Burn_Mosaic_", as.character(product_dates[i]), ".tif"))
+    # import existing burned area mosaic
+    raster_mosaic <- raster(paste0(mosaic_out_path, "\\", "Burn_Mosaic_", 
+                                   as.character(product_dates[i]), ".tif"))
   } else {
+    # select only query records for current month
     query_sel <- query[query$acquisitionDate == product_dates[i],]
+    # download all records for current month
     query_data <- getMODIS_data(query_sel, dir_out = MODIS_out_dir)
-    # convert to tif
+    # initialize an empty raster mosaic
     raster_mosaic <- NULL
-    j = 1
+    # loop through all downloaded records and add them to the mosaic
+    j <- 1
     while (j <= length(query_data)) {
       out_file <- gsub("hdf", "tif", query_data[j])
+      # check if a .tif version of the tile already exists
       if (!file.exists(out_file)) {
+        # convert .hdf to .tif
         sds <- get_subdatasets(query_data[j])
         name <- sds[1]
         gdal_translate(name, dst_dataset = out_file)
@@ -68,6 +79,7 @@ while (i <= length(product_dates)) {
       } else {
         message(paste0("TIF already exists: ", out_file))
       }
+      # add tile to mosaic
       if (is.null(raster_mosaic)) {
         raster_mosaic <- raster(out_file)
         message(paste0("New Mosaic created for date: ", product_dates[i]))
@@ -76,12 +88,13 @@ while (i <= length(product_dates)) {
         curr_ras <- raster(out_file)
         raster_mosaic <- mosaic(raster_mosaic, curr_ras, fun = mean)
       }
-      j = j + 1
+      j <- j + 1
     }
     # export raster mosaic
     message(paste0("Writing raster mosaic for date: ", product_dates[i]))
     mosaic_name <- paste0("Burn_Mosaic_", as.character(product_dates[i]))
-    writeRaster(raster_mosaic, paste0(mosaic_out_path, "\\", mosaic_name, ".tif"), format = 'GTiff', overwrite = T, progress = 'text')
+    writeRaster(raster_mosaic, paste0(mosaic_out_path, "\\", mosaic_name, ".tif"), 
+                format = 'GTiff', overwrite = T, progress = 'text')
     
   }
   message("Reclassifying raster mosaic...")
@@ -100,10 +113,10 @@ while (i <= length(product_dates)) {
     values(burn_acc) <- values(burn_acc) + values(raster_mosaic)
     message(paste0("Burned areas added to Burn Accumulation for date: ", product_dates[i]))
   }
-  i = i + 1
-  # Saving burn accumulation
-  writeRaster(burn_acc, paste0(burn_acc_out_path, "\\", "Burn_Acc.tif"), format = 'GTiff', overwrite = T, progress = 'text')
-  #DEBUG
+  i <- i + 1
+  # Savie burn accumulation
+  writeRaster(burn_acc, paste0(burn_acc_out_path, "\\", "Burn_Acc.tif"), format = 'GTiff', 
+              overwrite = T, progress = 'text')
   message("Plotting Burn Accumulation...")
   plot(burn_acc)
 }
