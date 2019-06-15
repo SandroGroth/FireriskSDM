@@ -120,3 +120,8 @@ while (i <= length(product_dates)) {
   message("Plotting Burn Accumulation...")
   plot(burn_acc)
 }
+
+# reproject burn intensity
+burn_acc_projected <- projectRaster(burn_acc, crs = study_area@proj4string)
+writeRaster(burn_acc_projected, paste0(burn_acc_out_path, "\\", "Burn_Acc_Reproj.tif"), format = 'GTiff', 
+            overwrite = T, progress = 'text')

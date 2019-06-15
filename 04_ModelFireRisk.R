@@ -10,10 +10,10 @@
 #----------------------------------------------------------------------------------------------------#
 # SETTINGS
 
-study_area_path <- "C:\\Users\\sandr\\Documents\\EAGLE_Data\\EuropeanStates.shp"
+study_area_path <- "C:\\Users\\sandr\\Documents\\EAGLE_Data\\EuropeanStates_Clip.shp"
 burn_occ_path <- "C:\\Users\\sandr\\Documents\\EAGLE_Data\\Burn_Acc_Vec.shp"
 
-corine_landcov <- "C:\\Users\\sandr\\Documents\\EAGLE_Data\\CORINE\\CLC2018_CLC2018_V2018_20b2.tif"
+glcc_landcov_path <- "C:\\Users\\sandr\\Documents\\EAGLE_Data\\MODIS_GLCC\\GLCC_Majority_Type_1.tif"
 
 #----------------------------------------------------------------------------------------------------#
 # IMPORTS
@@ -34,18 +34,20 @@ source("varImpBiomod.R")
 
 study_area <- readOGR(study_area_path)
 burn_occ <- readOGR(burn_occ_path)
+glcc_landcov <- raster(glcc_landcov_path)
 
 bio <- raster::getData('worldclim', var = "bio", res = 2.5)
 
 biocrop <- crop(bio, extent(study_area) + 10)
+glcc_crop <- crop(glcc_landcov, extent(study_area) + 10)
 
-plot(burn_occ, add = TRUE)
+biocrop <- stack(biocrop, glcc_crop)
 
 ########################################
 #' Collinearity
 #' -----------------------------
 #' ### Visual inspection of collinearity ###
-cm <- cor(getValues(bio), use = "complete.obs")
+cm <- cor(getValues(biocrop), use = "complete.obs")
 plotcorr(cm, col=ifelse(abs(cm) > 0.7, "red", "grey"))
 ########################################
 
@@ -54,7 +56,7 @@ plotcorr(cm, col=ifelse(abs(cm) > 0.7, "red", "grey"))
 burn_occ <- burn_occ[complete.cases(extract(biocrop, burn_occ)), ]
 
 #' ### Select an uncorrelated subset of environmental variables ###
-env <- subset(biocrop, c( "bio3", "bio5", "bio14", "bio15"))
+env <- subset(biocrop, c( "bio3", "bio5", "bio14", "bio15", "GLCC_Majority_Type_1"))
 
 #' Selecting 2000 random background points, excluding cells where
 #' the species is present
@@ -87,9 +89,9 @@ testdata <- fulldata[fold == 1, ]
 #' Unfortunately, there are often subtle differences in how the models
 #' are specified and in which data formats are useable
 
-varnames <- c("bio3", "bio5", "bio14", "bio15")
+varnames <- c("bio3", "bio5", "bio14", "bio15", "GLCC_Majority_Type_1")
 
-gammodel <- gam(burn_occ ~ s(bio3) + s(bio5) + s(bio14)+ s(bio15),
+gammodel <- gam(burn_occ ~ s(bio3) + s(bio5) + s(bio14)+ s(bio15) + s(GLCC_Majority_Type_1),
                 family="binomial", data=traindata)
 summary(gammodel)
 
