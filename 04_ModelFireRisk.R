@@ -13,6 +13,7 @@
 study_area_path <- "C:\\Users\\sandr\\Documents\\EAGLE_Data\\EuropeanStates_Clip.shp"
 burn_occ_path <- "C:\\Users\\sandr\\Documents\\EAGLE_Data\\Burn_Acc_Vec.shp"
 
+windspeed_path <- "C:\\Users\\sandr\\Documents\\EAGLE_Data\\SS2019_2nd_Term\\MET1_Spatial_modeling_and_prediction\\Final_Project\\R\\FireriskSDM\\wc2.0_2.5m_wind"
 glcc_landcov_path <- "C:\\Users\\sandr\\Documents\\EAGLE_Data\\MODIS_GLCC\\GLCC_Majority_Type_1.tif"
 
 #----------------------------------------------------------------------------------------------------#
@@ -35,13 +36,40 @@ source("varImpBiomod.R")
 study_area <- readOGR(study_area_path)
 burn_occ <- readOGR(burn_occ_path)
 glcc_landcov <- raster(glcc_landcov_path)
+windspeed_layer_paths <- list.files(windspeed_path, pattern = ".tif", full.names = T, no.. = T)
+
+# create mean windspeed layer
+wind_jan <- raster(windspeed_layer_paths[1])
+wind_feb <- raster(windspeed_layer_paths[2])
+wind_mar <- raster(windspeed_layer_paths[3])
+wind_apr <- raster(windspeed_layer_paths[4])
+wind_may <- raster(windspeed_layer_paths[5])
+wind_jun <- raster(windspeed_layer_paths[6])
+wind_jul <- raster(windspeed_layer_paths[7])
+wind_aug <- raster(windspeed_layer_paths[8])
+wind_sep <- raster(windspeed_layer_paths[9])
+wind_oct <- raster(windspeed_layer_paths[10])
+wind_nov <- raster(windspeed_layer_paths[11])
+wind_dec <- raster(windspeed_layer_paths[12])
+wind_avg <- (wind_jan + wind_feb + wind_mar + wind_apr + wind_may + wind_jun +
+             wind_jul + wind_aug + wind_sep + wind_oct + wind_nov + wind_dec) / 12
 
 bio <- raster::getData('worldclim', var = "bio", res = 2.5)
+bio_2050 <- raster::getData('CMIP5', var = "bio", model = 'AC', rcp = 45, year = 50,  res = 2.5)
+bio_2070 <- raster::getData('CMIP5', var = "bio", model = 'AC', rcp = 45, year = 70,  res = 2.5)
 
 biocrop <- crop(bio, extent(study_area) + 10)
+biocrop_2050 <- crop(bio_2050, extent(study_area) + 10)
+biocrop_2070 <- crop(bio_2070, extent(study_area) + 10)
+wind_crop <- crop(wind_avg, extent(study_area) + 10)
 glcc_crop <- crop(glcc_landcov, extent(study_area) + 10)
 
-biocrop <- stack(biocrop, glcc_crop)
+biocrop <- stack(biocrop, glcc_crop, wind_crop)
+biocrop_2050 <- stack(biocrop_2050, glcc_crop, wind_crop)
+biocrop_2070 <- stack(biocrop_2070, glcc_crop, wind_crop)
+
+names(biocrop_2050) <- names(biocrop)
+names(biocrop_2070) <- names(biocrop)
 
 ########################################
 #' Collinearity
@@ -56,7 +84,12 @@ plotcorr(cm, col=ifelse(abs(cm) > 0.7, "red", "grey"))
 burn_occ <- burn_occ[complete.cases(extract(biocrop, burn_occ)), ]
 
 #' ### Select an uncorrelated subset of environmental variables ###
-env <- subset(biocrop, c( "bio3", "bio5", "bio14", "bio15", "GLCC_Majority_Type_1"))
+env <- subset(biocrop, c( "bio4", "bio9", "bio14", 
+                          "bio15", "bio17", "bio18", "GLCC_Majority_Type_1", "layer"))
+env_2050 <- subset(biocrop_2050, c("bio4", "bio9", "bio14", 
+                   "bio15", "bio17", "bio18", "GLCC_Majority_Type_1", "layer"))
+env_2070 <- subset(biocrop_2070, c( "bio4", "bio9", "bio14", 
+                                    "bio15", "bio17", "bio18", "GLCC_Majority_Type_1", "layer"))
 
 #' Selecting 2000 random background points, excluding cells where
 #' the species is present
@@ -74,8 +107,7 @@ fulldata <- SpatialPointsDataFrame(rbind(presence, background),
                                                                      c(nrow(presence), nrow(background)))),
                                    match.ID = FALSE,
                                    proj4string = CRS(projection(env)))
-#' Add information of environmental conditions at point locations
-fulldata@data <- cbind(fulldata@data, extract(env, fulldata))
+
 
 #' 
 # Split data set into a training and test data set
@@ -89,9 +121,11 @@ testdata <- fulldata[fold == 1, ]
 #' Unfortunately, there are often subtle differences in how the models
 #' are specified and in which data formats are useable
 
-varnames <- c("bio3", "bio5", "bio14", "bio15", "GLCC_Majority_Type_1")
+varnames <- c("bio4", "bio9", "bio14", 
+              "bio15", "bio17", "bio18", "GLCC_Majority_Type_1", "layer")
 
-gammodel <- gam(burn_occ ~ s(bio3) + s(bio5) + s(bio14)+ s(bio15) + s(GLCC_Majority_Type_1),
+gammodel <- gam(burn_occ ~ s(bio4) + s(bio9) + s(bio14) + 
+                s(bio15) + s(bio17) + s(bio18) + s(GLCC_Majority_Type_1) + s(layer),
                 family="binomial", data=traindata)
 summary(gammodel)
 
@@ -116,6 +150,10 @@ plot(gammodel, pages = 1)
 
 # Prediction map
 gammap <- predict(env, gammodel, type = "response")
+gammap_2050 <- predict(env_2050, gammodel, type = "response")
+gammap_2070 <- predict(env_2070, gammodel, type = "response")
 
+par(mfrow=c(2,2))
 plot(gammap)
-
+plot(gammap_2050)
+plot(gammap_2070)
